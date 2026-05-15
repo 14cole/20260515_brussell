@@ -47,9 +47,9 @@ class RcsGrid:
             ValueError: if shapes do not match the expected grid.
         """
 
-        self.azimuths = np.asarray(azimuths)
-        self.elevations = np.asarray(elevations)
-        self.frequencies = np.asarray(frequencies)
+        self.azimuths = self._clean_axis(azimuths)
+        self.elevations = self._clean_axis(elevations)
+        self.frequencies = self._clean_axis(frequencies)
         pol_arr = np.asarray(polarizations)
         if pol_arr.dtype.kind == "O":
             # Normalize object arrays of strings to native unicode dtype so
@@ -559,6 +559,23 @@ class RcsGrid:
         if isinstance(value, (list, tuple, set)):
             return list(value)
         return [value]
+
+    @staticmethod
+    def _clean_axis(axis):
+        """Normalize an axis to float64 (numeric) or keep dtype (non-numeric).
+
+        For float32 input, round-trips each value through its shortest-decimal
+        repr so that user-intended values like 0.1 stay as 0.1 in float64
+        instead of inheriting the float32 quantization noise (0.10000000149...).
+        That way later ops like `shift_azimuth(180)` produce clean values
+        (180.1 instead of 180.10000001).
+        """
+        arr = np.asarray(axis)
+        if not np.issubdtype(arr.dtype, np.number):
+            return arr
+        if arr.dtype == np.float32:
+            return arr.astype(str).astype(np.float64)
+        return arr.astype(np.float64, copy=False)
 
     @staticmethod
     def _axis_value_match(axis_arr, value, tol=1e-6):
